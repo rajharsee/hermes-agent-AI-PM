@@ -161,3 +161,27 @@ class NotionClient:
             }
             for item in result.get("results", [])
         ]
+
+    def query_recent_pages(
+        self, database_id: str, since_iso: str, title_property_name: str = "Name"
+    ) -> list[dict]:
+        """Returns pages in `database_id` created on/after `since_iso`
+        (an ISO 8601 date string). Used by sprint-digest to surface
+        recently published PRDs alongside Jira activity."""
+        payload = {
+            "filter": {
+                "timestamp": "created_time",
+                "created_time": {"on_or_after": since_iso},
+            },
+            "sorts": [{"timestamp": "created_time", "direction": "descending"}],
+        }
+        result = self._request(
+            "POST", f"/databases/{database_id}/query", json=payload
+        )
+        pages = []
+        for item in result.get("results", []):
+            title_prop = item.get("properties", {}).get(title_property_name, {})
+            title_parts = title_prop.get("title", [])
+            title = "".join(t.get("plain_text", "") for t in title_parts) or "(untitled)"
+            pages.append({"title": title, "url": item.get("url")})
+        return pages
